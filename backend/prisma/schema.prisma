@@ -1,0 +1,73 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id              String           @id @default(uuid())
+  email           String           @unique
+  password        String
+  name            String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  resumes         Resume[]
+  jobDescriptions JobDescription[]
+}
+
+model Resume {
+  id               String           @id @default(uuid())
+  filename         String
+  filePath         String
+  fileType         String           // "pdf" | "docx" | "doc"
+  parsedText       String           @db.LongText
+  candidateName    String?
+  candidateEmail   String?
+  candidatePhone   String?
+  candidateSkills  String           @db.Text // Comma-separated list of parsed skills
+  candidateEducation String?        @db.Text
+  candidateExperience String?       @db.Text // Extracted experience details
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scores           CandidateScore[]
+}
+
+model JobDescription {
+  id           String           @id @default(uuid())
+  title        String
+  description  String           @db.LongText
+  skills       String           @db.Text // Comma-separated target skills
+  minExperience Int?            // Desired minimum years of experience
+  education    String?          @db.Text // Desired education level
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  userId       String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scores           CandidateScore[]
+}
+
+model CandidateScore {
+  id               String         @id @default(uuid())
+  score            Float          // 0 to 100
+  matchingSkills   String         @db.Text // Comma-separated matching skills
+  missingSkills    String         @db.Text // Comma-separated missing skills
+  experienceScore  Float          // Relevance breakdown
+  educationScore   Float          // Relevance breakdown
+  skillsScore      Float          // Relevance breakdown
+  overallSummary   String?        @db.Text // Summary review
+  topStrengths     String         @db.Text // Comma-separated strengths
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  resumeId         String
+  resume           Resume         @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  jobDescriptionId String
+  jobDescription   JobDescription @relation(fields: [jobDescriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([resumeId, jobDescriptionId])
+}
+

@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Production / Builds
+/backend/dist/
+/frontend/.next/
+/frontend/out/
+/frontend/build/
+
+# Local Environment Variables & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Recruiter Resume Uploads (Ignore actual files, but keep uploads directory configuration)
+/backend/uploads/*
+!/backend/uploads/.gitkeep
+
+# System Files & Logs
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor & IDE configurations
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -1,0 +1,20 @@
+# Node.js dependencies
+node_modules/
+
+# Local Environment Secrets
+.env
+.env*.local
+
+# Production Build output
+dist/
+
+# Recruiter Resume File Uploads (local system disk)
+uploads/*
+!uploads/.gitkeep
+
+# System & Editor Settings
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

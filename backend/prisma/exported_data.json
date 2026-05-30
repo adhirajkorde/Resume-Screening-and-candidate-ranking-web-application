@@ -1,0 +1,23 @@
+{
+  "users": [
+    {
+      "id": "dcec83f5-e318-4d10-b138-ba24f2de8b99",
+      "email": "kordeadhiraj.ml@gmail.com",
+      "password": "$2a$10$6hhnHT2B/ZQUwKHMtSKYuel0fh4EpEBMuRlqin9bL0Dk53s.0.6FC",
+      "name": "Adhiraj Korde",
+      "createdAt": "2026-05-28T17:51:01.916Z",
+      "updatedAt": "2026-05-28T17:51:01.916Z"
+    },
+    {
+      "id": "77750e49-3ec6-4570-a85c-105b53be1f3b",
+      "email": "adhirajkorde.codes@gmail.com",
+      "password": "$2a$10$PLdYXMRPx4vs6QVI.SuBIuwNDx67a.4qrHaORSJycmQlqWwDdqmn6",
+      "name": "adhi",
+      "createdAt": "2026-05-28T17:57:13.210Z",
+      "updatedAt": "2026-05-28T17:57:13.210Z"
+    }
+  ],
+  "resumes": [],
+  "jobDescriptions": [],
+  "candidateScores": []
+}
