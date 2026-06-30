@@ -8,8 +8,13 @@ import resumeRoutes from "./routes/resume.routes";
 import jobRoutes from "./routes/job.routes";
 import analysisRoutes from "./routes/analysis.routes";
 
+import connectDB from "./config/db";
+
 // Load environment variables
 dotenv.config();
+
+// Connect to MongoDB
+connectDB();
 
 const app = express();
 const PORT = process.env.PORT || 5088;

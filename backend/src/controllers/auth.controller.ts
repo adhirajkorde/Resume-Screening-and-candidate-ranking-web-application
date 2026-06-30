@@ -1,7 +1,7 @@
 import { Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import prisma from "../utils/prisma";
+import { User } from "../models/User";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 
 const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key-resume-screening-system-2026";
@@ -21,9 +21,7 @@ export class AuthController {
       }
 
       // Check if email already exists
-      const existingUser = await prisma.user.findUnique({
-        where: { email }
-      });
+      const existingUser = await User.findOne({ email });
 
       if (existingUser) {
         res.status(400).json({ error: "Email is already registered." });
@@ -35,12 +33,10 @@ export class AuthController {
       const hashedPassword = await bcrypt.hash(password, salt);
 
       // Create user
-      const user = await prisma.user.create({
-        data: {
-          email: email.toLowerCase().trim(),
-          password: hashedPassword,
-          name: name.trim()
-        }
+      const user = await User.create({
+        email: email.toLowerCase().trim(),
+        password: hashedPassword,
+        name: name.trim()
       });
 
       // Issue JWT
@@ -78,20 +74,16 @@ export class AuthController {
       }
 
       // Find user
-      let user = await prisma.user.findUnique({
-        where: { email: email.toLowerCase().trim() }
-      });
+      let user = await User.findOne({ email: email.toLowerCase().trim() });
 
       // Auto-provision admin@ats.com on the fly if it was deleted during compliance testing
       if (!user && email.toLowerCase().trim() === "admin@ats.com") {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash("admin123", salt);
-        user = await prisma.user.create({
-          data: {
-            email: "admin@ats.com",
-            password: hashedPassword,
-            name: "Alex Mercer"
-          }
+        user = await User.create({
+          email: "admin@ats.com",
+          password: hashedPassword,
+          name: "Alex Mercer"
         });
       }
 
@@ -101,7 +93,7 @@ export class AuthController {
       }
 
       // Verify password
-      const isMatch = await bcrypt.compare(password, user.password);
+      const isMatch = await bcrypt.compare(password, user.password as string);
       if (!isMatch) {
         res.status(401).json({ error: "Invalid email or password." });
         return;
@@ -139,10 +131,7 @@ export class AuthController {
         return;
       }
 
-      const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
-        select: { id: true, name: true, email: true, createdAt: true }
-      });
+      const user = await User.findById(req.user.id).select("name email createdAt");
 
       if (!user) {
         res.status(404).json({ error: "User not found." });
@@ -166,10 +155,8 @@ export class AuthController {
         return;
       }
 
-      // Delete user (Prisma onDelete Cascade automatically deletes Resumes, Jobs, and Score records)
-      await prisma.user.delete({
-        where: { id: req.user.id }
-      });
+      // Delete user (Mongoose pre hook automatically deletes Resumes, Jobs, and Score records)
+      await User.findOneAndDelete({ _id: req.user.id });
 
       res.status(200).json({ message: "Your account and all associated pipelines have been permanently deleted." });
     } catch (error: any) {

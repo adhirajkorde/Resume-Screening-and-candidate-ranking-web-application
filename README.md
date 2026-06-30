@@ -28,10 +28,10 @@ SmartHire is a simple, modern, and professional Resume Screening & Candidate Ran
 *   **Express**
 
 ### Database
-*   **MySQL** (Relational Database)
+*   **MongoDB** (NoSQL Database)
 
-### ORM
-*   **Prisma**
+### ODM
+*   **Mongoose**
 
 ---
 
@@ -40,8 +40,9 @@ SmartHire is a simple, modern, and professional Resume Screening & Candidate Ran
 Create a `.env` file in the **`backend`** directory:
 ```env
 PORT=5088
-DATABASE_URL="mysql://username:password@localhost:3306/resume_screening_db"
+MONGODB_URI="mongodb://localhost:27017/resume-ranking"
 JWT_SECRET="your-jwt-signing-secret"
+JWT_EXPIRES_IN="7d"
 ```
 
 Create a `.env` file in the **`frontend`** directory:
@@ -56,15 +57,9 @@ NEXT_PUBLIC_API_URL="http://localhost:5088/api"
 Follow these simple steps to run the project locally:
 
 ### 1. Pre-requisites
-Ensure you have **Node.js** (v18+) and **MySQL Server** installed and running on your system.
+Ensure you have **Node.js** (v18+) and **MongoDB** installed and running on your system, or have a MongoDB Atlas connection string.
 
-### 2. Database Setup
-Log into your MySQL terminal and create a new database:
-```sql
-CREATE DATABASE resume_screening_db;
-```
-
-### 3. Backend Setup
+### 2. Backend Setup
 1. Open a terminal and navigate to the backend directory:
    ```bash
    cd backend
@@ -73,20 +68,13 @@ CREATE DATABASE resume_screening_db;
    ```bash
    npm install
    ```
-3. Run the Prisma migrations to set up the database tables:
-   ```bash
-   npx prisma db push
-   ```
-4. Run the seed script to create a default admin recruiter account:
-   ```bash
-   npm run prisma:seed
-   ```
-5. Start the backend developer server:
+3. Start the backend developer server:
    ```bash
    npm run dev
    ```
+   *(Note: The `admin@ats.com` user is auto-provisioned upon first login attempt with password `admin123` if it does not exist)*
 
-### 4. Frontend Setup
+### 3. Frontend Setup
 1. Open a new terminal and navigate to the frontend directory:
    ```bash
    cd frontend
@@ -111,12 +99,13 @@ Open **`http://localhost:3088`** in your browser. You can log in using the seed 
 A simplified view of the folders in this repository:
 ```text
 ├── backend/
-│   ├── prisma/             # Schema definitions and database seeds
 │   └── src/
+│       ├── config/         # Database configuration (db.ts)
 │       ├── controllers/    # API request handlers (auth, resumes, jobs, analysis)
+│       ├── models/         # Mongoose schema definitions
 │       ├── routes/         # Express endpoint definitions
 │       ├── services/       # Resume parser and scoring algorithms
-│       └── server.ts       # Application entry point
+│       └── index.ts        # Application entry point
 ├── frontend/
 │   └── src/
 │       ├── app/            # Next.js pages, layouts, and styles

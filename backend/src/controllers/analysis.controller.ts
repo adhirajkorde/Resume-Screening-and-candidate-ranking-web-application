@@ -1,5 +1,7 @@
 import { Response } from "express";
-import prisma from "../utils/prisma";
+import { JobDescription } from "../models/JobDescription";
+import { Resume } from "../models/Resume";
+import { CandidateScore } from "../models/CandidateScore";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { ScoringService } from "../services/scoring.service";
 
@@ -22,11 +24,9 @@ export class AnalysisController {
       }
 
       // Check job description existence
-      const jobDescription = await prisma.jobDescription.findFirst({
-        where: {
-          id: jobDescriptionId,
-          userId: req.user.id
-        }
+      const jobDescription = await JobDescription.findOne({
+        _id: jobDescriptionId,
+        userId: req.user.id
       });
 
       if (!jobDescription) {
@@ -35,10 +35,7 @@ export class AnalysisController {
       }
 
       // Fetch all resumes for the user
-      // Fetch all resumes for the user
-      const resumes = await prisma.resume.findMany({
-        where: { userId: req.user.id }
-      });
+      const resumes = await Resume.find({ userId: req.user.id });
 
       if (resumes.length === 0) {
         res.status(400).json({ error: "No resumes found. Please upload resumes before initiating analysis." });
@@ -62,26 +59,12 @@ export class AnalysisController {
         );
 
         // Upsert matching score
-        const candidateScore = await prisma.candidateScore.upsert({
-          where: {
-            resumeId_jobDescriptionId: {
-              resumeId: resume.id,
-              jobDescriptionId: jobDescription.id
-            }
-          },
-          update: {
-            score: scoreResult.score,
-            matchingSkills: scoreResult.matchingSkills.join(","),
-            missingSkills: scoreResult.missingSkills.join(","),
-            experienceScore: scoreResult.experienceScore,
-            educationScore: scoreResult.educationScore,
-            skillsScore: scoreResult.skillsScore,
-            overallSummary: scoreResult.overallSummary,
-            topStrengths: scoreResult.topStrengths.join(",")
-          },
-          create: {
+        const candidateScore = await CandidateScore.findOneAndUpdate(
+          {
             resumeId: resume.id,
-            jobDescriptionId: jobDescription.id,
+            jobDescriptionId: jobDescription.id
+          },
+          {
             score: scoreResult.score,
             matchingSkills: scoreResult.matchingSkills.join(","),
             missingSkills: scoreResult.missingSkills.join(","),
@@ -90,8 +73,9 @@ export class AnalysisController {
             skillsScore: scoreResult.skillsScore,
             overallSummary: scoreResult.overallSummary,
             topStrengths: scoreResult.topStrengths.join(",")
-          }
-        });
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
 
         results.push({
           candidateName: resume.candidateName,
@@ -102,42 +86,31 @@ export class AnalysisController {
       }
 
       // Fetch all scores for this JD, ordered highest to lowest
-      const rankings = await prisma.candidateScore.findMany({
-        where: {
-          jobDescriptionId: jobDescription.id,
-          resume: {
-            userId: req.user.id
-          }
-        },
-        include: {
-          resume: {
-            select: {
-              id: true,
-              candidateName: true,
-              candidateEmail: true,
-              candidatePhone: true,
-              candidateSkills: true,
-              candidateEducation: true,
-              candidateExperience: true,
-              fileType: true
-            }
-          }
-        },
-        orderBy: {
-          score: "desc"
-        }
+      const rankings = await CandidateScore.find({
+        jobDescriptionId: jobDescription.id
+      })
+      .populate('resume')
+      .sort({ score: -1 });
+      
+      // Filter out scores where the populated resume doesn't belong to this user (extra safety)
+      const userRankings = rankings.filter(r => {
+        const resObj: any = r.resume;
+        return resObj && resObj.userId === req.user?.id;
       });
 
-      const formattedRankings = rankings.map(r => ({
-        ...r,
-        matchingSkills: typeof r.matchingSkills === "string" ? r.matchingSkills.split(",").filter(Boolean) : [],
-        missingSkills: typeof r.missingSkills === "string" ? r.missingSkills.split(",").filter(Boolean) : [],
-        topStrengths: typeof r.topStrengths === "string" ? r.topStrengths.split(",").filter(Boolean) : [],
-        resume: {
-          ...r.resume,
-          candidateSkills: typeof r.resume.candidateSkills === "string" ? r.resume.candidateSkills.split(",").filter(Boolean) : []
-        }
-      }));
+      const formattedRankings = userRankings.map(r => {
+        const rankObj = r.toJSON();
+        return {
+          ...rankObj,
+          matchingSkills: typeof rankObj.matchingSkills === "string" ? rankObj.matchingSkills.split(",").filter(Boolean) : [],
+          missingSkills: typeof rankObj.missingSkills === "string" ? rankObj.missingSkills.split(",").filter(Boolean) : [],
+          topStrengths: typeof rankObj.topStrengths === "string" ? rankObj.topStrengths.split(",").filter(Boolean) : [],
+          resume: {
+            ...(rankObj.resume as any),
+            candidateSkills: typeof (rankObj.resume as any).candidateSkills === "string" ? (rankObj.resume as any).candidateSkills.split(",").filter(Boolean) : []
+          }
+        };
+      });
 
       res.status(200).json({
         message: "Analysis completed successfully.",
@@ -161,42 +134,30 @@ export class AnalysisController {
 
       const { jobDescriptionId } = req.params;
 
-      const rankings = await prisma.candidateScore.findMany({
-        where: {
-          jobDescriptionId: jobDescriptionId,
-          resume: {
-            userId: req.user.id
-          }
-        },
-        include: {
-          resume: {
-            select: {
-              id: true,
-              candidateName: true,
-              candidateEmail: true,
-              candidatePhone: true,
-              candidateSkills: true,
-              candidateEducation: true,
-              candidateExperience: true,
-              fileType: true
-            }
-          }
-        },
-        orderBy: {
-          score: "desc"
-        }
+      const rankings = await CandidateScore.find({
+        jobDescriptionId: jobDescriptionId
+      })
+      .populate('resume')
+      .sort({ score: -1 });
+
+      const userRankings = rankings.filter(r => {
+        const resObj: any = r.resume;
+        return resObj && resObj.userId === req.user?.id;
       });
 
-      const formattedRankings = rankings.map(r => ({
-        ...r,
-        matchingSkills: typeof r.matchingSkills === "string" ? r.matchingSkills.split(",").filter(Boolean) : [],
-        missingSkills: typeof r.missingSkills === "string" ? r.missingSkills.split(",").filter(Boolean) : [],
-        topStrengths: typeof r.topStrengths === "string" ? r.topStrengths.split(",").filter(Boolean) : [],
-        resume: {
-          ...r.resume,
-          candidateSkills: typeof r.resume.candidateSkills === "string" ? r.resume.candidateSkills.split(",").filter(Boolean) : []
-        }
-      }));
+      const formattedRankings = userRankings.map(r => {
+        const rankObj = r.toJSON();
+        return {
+          ...rankObj,
+          matchingSkills: typeof rankObj.matchingSkills === "string" ? rankObj.matchingSkills.split(",").filter(Boolean) : [],
+          missingSkills: typeof rankObj.missingSkills === "string" ? rankObj.missingSkills.split(",").filter(Boolean) : [],
+          topStrengths: typeof rankObj.topStrengths === "string" ? rankObj.topStrengths.split(",").filter(Boolean) : [],
+          resume: {
+            ...(rankObj.resume as any),
+            candidateSkills: typeof (rankObj.resume as any).candidateSkills === "string" ? (rankObj.resume as any).candidateSkills.split(",").filter(Boolean) : []
+          }
+        };
+      });
 
       res.status(200).json(formattedRankings);
     } catch (error: any) {
@@ -217,11 +178,9 @@ export class AnalysisController {
 
       const { jobDescriptionId } = req.params;
 
-      const jd = await prisma.jobDescription.findFirst({
-        where: {
-          id: jobDescriptionId,
-          userId: req.user.id
-        }
+      const jd = await JobDescription.findOne({
+        _id: jobDescriptionId,
+        userId: req.user.id
       });
 
       if (!jd) {
@@ -229,31 +188,30 @@ export class AnalysisController {
         return;
       }
 
-      const rankings = await prisma.candidateScore.findMany({
-        where: {
-          jobDescriptionId: jobDescriptionId,
-          resume: {
-            userId: req.user.id
-          }
-        },
-        include: {
-          resume: true
-        },
-        orderBy: {
-          score: "desc"
-        }
+      const rankings = await CandidateScore.find({
+        jobDescriptionId: jobDescriptionId
+      })
+      .populate('resume')
+      .sort({ score: -1 });
+      
+      const userRankings = rankings.filter(r => {
+        const resObj: any = r.resume;
+        return resObj && resObj.userId === req.user?.id;
       });
 
-      const formattedRankings = rankings.map(r => ({
-        ...r,
-        matchingSkills: typeof r.matchingSkills === "string" ? r.matchingSkills.split(",").filter(Boolean) : [],
-        missingSkills: typeof r.missingSkills === "string" ? r.missingSkills.split(",").filter(Boolean) : [],
-        topStrengths: typeof r.topStrengths === "string" ? r.topStrengths.split(",").filter(Boolean) : [],
-        resume: {
-          ...r.resume,
-          candidateSkills: typeof r.resume.candidateSkills === "string" ? r.resume.candidateSkills.split(",").filter(Boolean) : []
-        }
-      }));
+      const formattedRankings = userRankings.map(r => {
+        const rankObj = r.toJSON();
+        return {
+          ...rankObj,
+          matchingSkills: typeof rankObj.matchingSkills === "string" ? rankObj.matchingSkills.split(",").filter(Boolean) : [],
+          missingSkills: typeof rankObj.missingSkills === "string" ? rankObj.missingSkills.split(",").filter(Boolean) : [],
+          topStrengths: typeof rankObj.topStrengths === "string" ? rankObj.topStrengths.split(",").filter(Boolean) : [],
+          resume: {
+            ...(rankObj.resume as any),
+            candidateSkills: typeof (rankObj.resume as any).candidateSkills === "string" ? (rankObj.resume as any).candidateSkills.split(",").filter(Boolean) : []
+          }
+        };
+      });
 
       // Construct CSV content
       const headers = [
@@ -270,7 +228,7 @@ export class AnalysisController {
 
       const csvRows = [headers.join(",")];
 
-      formattedRankings.forEach((rank, index) => {
+      formattedRankings.forEach((rank: any, index) => {
         const row = [
           index + 1,
           `"${(rank.resume.candidateName || "Unknown").replace(/"/g, '""')}"`,

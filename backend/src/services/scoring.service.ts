@@ -1,4 +1,4 @@
-import { Resume, JobDescription } from "@prisma/client";
+import { IJobDescription } from "../models/JobDescription";
 
 export interface ScoreResult {
   score: number;
@@ -20,7 +20,7 @@ export class ScoringService {
     resumeText: string,
     resumeExperienceText: string,
     resumeEducationText: string,
-    jobDescription: JobDescription
+    jobDescription: IJobDescription
   ): ScoreResult {
     // 1. EXTRACT TARGET SKILLS FROM JOB DESCRIPTION IF NOT POPULATED
     let targetSkills: string[] = [];

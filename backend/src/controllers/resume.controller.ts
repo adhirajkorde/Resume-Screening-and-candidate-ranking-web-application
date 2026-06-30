@@ -1,7 +1,7 @@
 import { Response } from "express";
 import fs from "fs";
 import path from "path";
-import prisma from "../utils/prisma";
+import { Resume } from "../models/Resume";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { ParserService } from "../services/parser.service";
 
@@ -38,24 +38,22 @@ export class ResumeController {
           const fileType = path.extname(file.originalname).substring(1).toLowerCase() || "pdf";
 
           // Save in database
-          const resume = await prisma.resume.create({
-            data: {
-              filename: file.originalname,
-              filePath: file.path,
-              fileType: fileType,
-              parsedText: parsedData.parsedText,
-              candidateName: parsedData.candidateName,
-              candidateEmail: parsedData.candidateEmail,
-              candidatePhone: parsedData.candidatePhone,
-              candidateSkills: parsedData.candidateSkills.join(","),
-              candidateEducation: parsedData.candidateEducation,
-              candidateExperience: parsedData.candidateExperience,
-              userId: userId
-            }
+          const resume = await Resume.create({
+            filename: file.originalname,
+            filePath: file.path,
+            fileType: fileType,
+            parsedText: parsedData.parsedText,
+            candidateName: parsedData.candidateName,
+            candidateEmail: parsedData.candidateEmail,
+            candidatePhone: parsedData.candidatePhone,
+            candidateSkills: parsedData.candidateSkills.join(","),
+            candidateEducation: parsedData.candidateEducation,
+            candidateExperience: parsedData.candidateExperience,
+            userId: userId
           });
 
           const formattedResume = {
-            ...resume,
+            ...resume.toJSON(),
             candidateSkills: typeof resume.candidateSkills === 'string' ? resume.candidateSkills.split(',').filter(Boolean) : []
           };
 
@@ -94,22 +92,15 @@ export class ResumeController {
         return;
       }
 
-      const resumes = await prisma.resume.findMany({
-        where: { userId: req.user.id },
-        orderBy: { createdAt: "desc" },
-        include: {
-          scores: {
-            select: {
-              id: true,
-              score: true,
-              jobDescriptionId: true
-            }
-          }
-        }
-      });
+      const resumes = await Resume.find({ userId: req.user.id })
+        .sort({ createdAt: -1 })
+        .populate({
+          path: 'scores',
+          select: 'score jobDescriptionId'
+        });
 
       const formattedResumes = resumes.map(r => ({
-        ...r,
+        ...r.toJSON(),
         candidateSkills: typeof r.candidateSkills === 'string' ? r.candidateSkills.split(',').filter(Boolean) : []
       }));
 
@@ -132,22 +123,15 @@ export class ResumeController {
 
       const { id } = req.params;
 
-      const resume = await prisma.resume.findFirst({
-        where: {
-          id: id,
-          userId: req.user.id
-        },
-        include: {
-          scores: {
-            include: {
-              jobDescription: {
-                select: {
-                  id: true,
-                  title: true
-                }
-              }
-            }
-          }
+      const resume = await Resume.findOne({
+        _id: id,
+        userId: req.user.id
+      }).populate({
+        path: 'scores',
+        populate: {
+          path: 'jobDescriptionId',
+          model: 'JobDescription',
+          select: 'title'
         }
       });
 
@@ -156,8 +140,23 @@ export class ResumeController {
         return;
       }
 
+      // Mongoose populates the actual object into the ref field. We need to map it correctly.
+      const resumeJSON = resume.toJSON();
+      
+      // Mongoose might populate jobDescriptionId directly as the object instead of nesting it in `jobDescription`.
+      // Let's format it to match the previous Prisma response format.
+      if (resumeJSON.scores) {
+         resumeJSON.scores = (resumeJSON.scores as any[]).map(score => {
+             const { jobDescriptionId, ...rest } = score;
+             return {
+                 ...rest,
+                 jobDescription: jobDescriptionId
+             };
+         });
+      }
+
       const formattedResume = {
-        ...resume,
+        ...resumeJSON,
         candidateSkills: typeof resume.candidateSkills === 'string' ? resume.candidateSkills.split(',').filter(Boolean) : []
       };
 
@@ -180,11 +179,9 @@ export class ResumeController {
 
       const { id } = req.params;
 
-      const resume = await prisma.resume.findFirst({
-        where: {
-          id: id,
-          userId: req.user.id
-        }
+      const resume = await Resume.findOne({
+        _id: id,
+        userId: req.user.id
       });
 
       if (!resume) {
@@ -217,11 +214,9 @@ export class ResumeController {
 
       const { id } = req.params;
 
-      const resume = await prisma.resume.findFirst({
-        where: {
-          id: id,
-          userId: req.user.id
-        }
+      const resume = await Resume.findOne({
+        _id: id,
+        userId: req.user.id
       });
 
       if (!resume) {
@@ -229,10 +224,8 @@ export class ResumeController {
         return;
       }
 
-      // Delete database record
-      await prisma.resume.delete({
-        where: { id: id }
-      });
+      // Delete database record (triggers pre hook to cascade scores)
+      await Resume.findOneAndDelete({ _id: id });
 
       // Delete physical file on disk
       if (fs.existsSync(resume.filePath)) {

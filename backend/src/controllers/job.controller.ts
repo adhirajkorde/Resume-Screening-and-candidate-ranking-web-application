@@ -1,5 +1,5 @@
 import { Response } from "express";
-import prisma from "../utils/prisma";
+import { JobDescription } from "../models/JobDescription";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 
 export class JobController {
@@ -28,19 +28,17 @@ export class JobController {
         skillsArray = skills.split(",").map(s => s.trim()).filter(s => s.length > 0);
       }
 
-      const jobDescription = await prisma.jobDescription.create({
-        data: {
-          title: title.trim(),
-          description: description.trim(),
-          skills: skillsArray.join(","),
-          minExperience: minExperience ? parseInt(minExperience, 10) : null,
-          education: education ? education.trim() : null,
-          userId: req.user.id
-        }
+      const jobDescription = await JobDescription.create({
+        title: title.trim(),
+        description: description.trim(),
+        skills: skillsArray.join(","),
+        minExperience: minExperience ? parseInt(minExperience, 10) : undefined,
+        education: education ? education.trim() : undefined,
+        userId: req.user.id
       });
 
       const formattedJob = {
-        ...jobDescription,
+        ...jobDescription.toJSON(),
         skills: typeof jobDescription.skills === 'string' ? jobDescription.skills.split(',').filter(Boolean) : []
       };
 
@@ -64,13 +62,10 @@ export class JobController {
         return;
       }
 
-      const jobs = await prisma.jobDescription.findMany({
-        where: { userId: req.user.id },
-        orderBy: { createdAt: "desc" }
-      });
+      const jobs = await JobDescription.find({ userId: req.user.id }).sort({ createdAt: -1 });
 
       const formattedJobs = jobs.map(job => ({
-        ...job,
+        ...job.toJSON(),
         skills: typeof job.skills === 'string' ? job.skills.split(',').filter(Boolean) : []
       }));
 
@@ -93,11 +88,9 @@ export class JobController {
 
       const { id } = req.params;
 
-      const job = await prisma.jobDescription.findFirst({
-        where: {
-          id: id,
-          userId: req.user.id
-        }
+      const job = await JobDescription.findOne({
+        _id: id,
+        userId: req.user.id
       });
 
       if (!job) {
@@ -106,7 +99,7 @@ export class JobController {
       }
 
       const formattedJob = {
-        ...job,
+        ...job.toJSON(),
         skills: typeof job.skills === 'string' ? job.skills.split(',').filter(Boolean) : []
       };
 
@@ -129,11 +122,9 @@ export class JobController {
 
       const { id } = req.params;
 
-      const job = await prisma.jobDescription.findFirst({
-        where: {
-          id: id,
-          userId: req.user.id
-        }
+      const job = await JobDescription.findOne({
+        _id: id,
+        userId: req.user.id
       });
 
       if (!job) {
@@ -141,9 +132,7 @@ export class JobController {
         return;
       }
 
-      await prisma.jobDescription.delete({
-        where: { id: id }
-      });
+      await JobDescription.findOneAndDelete({ _id: id });
 
       res.status(200).json({ message: "Job description deleted successfully." });
     } catch (error: any) {
